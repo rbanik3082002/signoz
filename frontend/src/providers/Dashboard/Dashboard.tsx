@@ -1,7 +1,10 @@
 import { Modal } from 'antd';
+import getLocalStorageKey from 'api/browser/localstorage/get';
+import setLocalStorageKey from 'api/browser/localstorage/set';
 import getDashboard from 'api/dashboard/get';
 import lockDashboardApi from 'api/dashboard/lockDashboard';
 import unlockDashboardApi from 'api/dashboard/unlockDashboard';
+import { LOCALSTORAGE } from 'constants/localStorage';
 import { REACT_QUERY_KEY } from 'constants/reactQueryKeys';
 import ROUTES from 'constants/routes';
 import { getMinMax } from 'container/TopNav/AutoRefresh/config';
@@ -103,11 +106,56 @@ export function DashboardProvider({
 	const { t } = useTranslation(['dashboard']);
 	const dashboardRef = useRef<Dashboard>();
 
+	const mergeDBWithLocalStorage = (
+		data: Dashboard,
+		localStorageVariables: any,
+	): Dashboard => {
+		const updatedData = data;
+		if (data && localStorageVariables) {
+			const updatedVariables = data.data.variables;
+			Object.keys(data.data.variables).forEach((variable) => {
+				const updatedVariable = {
+					...data.data.variables[variable],
+					...localStorageVariables[variable as any],
+				};
+
+				updatedVariables[variable] = updatedVariable;
+			});
+			updatedData.data.variables = updatedVariables;
+		}
+		return updatedData;
+	};
 	// As we do not have order and ID's in the variables object, we have to process variables to add order and ID if they do not exist in the variables object
 	// eslint-disable-next-line sonarjs/cognitive-complexity
 	const transformDashboardVariables = (data: Dashboard): Dashboard => {
 		if (data && data.data && data.data.variables) {
-			const clonedDashboardData = JSON.parse(JSON.stringify(data));
+			const allDashboardVariablesFromLocalStorage = getLocalStorageKey(
+				LOCALSTORAGE.DASHBOARD_VARIABLES,
+			);
+
+			let currentDashboardVariablesFromLocalStorage = {};
+
+			if (allDashboardVariablesFromLocalStorage === null) {
+				setLocalStorageKey(
+					LOCALSTORAGE.DASHBOARD_VARIABLES,
+					JSON.stringify({
+						[data.uuid]: {},
+					}),
+				);
+			} else {
+				try {
+					currentDashboardVariablesFromLocalStorage = JSON.parse(
+						allDashboardVariablesFromLocalStorage,
+					)[data.uuid];
+				} catch {
+					currentDashboardVariablesFromLocalStorage = {};
+				}
+			}
+
+			const clonedDashboardData = mergeDBWithLocalStorage(
+				JSON.parse(JSON.stringify(data)),
+				currentDashboardVariablesFromLocalStorage,
+			);
 			const { variables } = clonedDashboardData.data;
 			const existingOrders: Set<number> = new Set();
 

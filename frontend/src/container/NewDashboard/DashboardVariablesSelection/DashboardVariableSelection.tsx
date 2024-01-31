@@ -1,6 +1,10 @@
 import { Row } from 'antd';
+import getLocalStorageKey from 'api/browser/localstorage/get';
+import setLocalStorageKey from 'api/browser/localstorage/set';
+import { LOCALSTORAGE } from 'constants/localStorage';
 import { useUpdateDashboard } from 'hooks/dashboard/useUpdateDashboard';
 import { useNotifications } from 'hooks/useNotifications';
+import { defaultTo } from 'lodash-es';
 import { useDashboard } from 'providers/Dashboard/Dashboard';
 import { memo, useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
@@ -9,10 +13,15 @@ import { Dashboard, IDashboardVariable } from 'types/api/dashboard/getAll';
 import AppReducer from 'types/reducer/app';
 
 import { convertVariablesToDbFormat } from './util';
+// import { convertVariablesToDbFormat } from './util';
 import VariableItem from './VariableItem';
 
 function DashboardVariableSelection(): JSX.Element | null {
-	const { selectedDashboard, setSelectedDashboard } = useDashboard();
+	const {
+		selectedDashboard,
+		setSelectedDashboard,
+		dashboardId,
+	} = useDashboard();
 
 	const { data } = selectedDashboard || {};
 
@@ -23,7 +32,7 @@ function DashboardVariableSelection(): JSX.Element | null {
 
 	const [variablesTableData, setVariablesTableData] = useState<any>([]);
 
-	const { role } = useSelector<AppState, AppReducer>((state) => state.app);
+	// const { role } = useSelector<AppState, AppReducer>((state) => state.app);
 
 	useEffect(() => {
 		if (variables) {
@@ -106,11 +115,68 @@ function DashboardVariableSelection(): JSX.Element | null {
 				},
 			);
 
+			const allDashboardVariablesFromLocalStorageString = getLocalStorageKey(
+				LOCALSTORAGE.DASHBOARD_VARIABLES,
+			);
+
+			let allDashboardsFromLocalStorage = {};
+			let currentDashboardVariablesFromLocalStorage = {};
+
+			if (allDashboardVariablesFromLocalStorageString === null) {
+				setLocalStorageKey(
+					LOCALSTORAGE.DASHBOARD_VARIABLES,
+					JSON.stringify({
+						[dashboardId]: {},
+					}),
+				);
+			} else {
+				try {
+					allDashboardsFromLocalStorage = JSON.parse(
+						allDashboardVariablesFromLocalStorageString,
+					);
+					// currentDashboardVariablesFromLocalStorage = JSON.parse(
+					// 	allDashboardVariablesFromLocalStorage,
+					// )[dashboardId];
+				} catch {
+					allDashboardsFromLocalStorage = {};
+				}
+			}
+			currentDashboardVariablesFromLocalStorage = defaultTo(
+				allDashboardsFromLocalStorage?.[dashboardId],
+				{},
+			);
+			currentDashboardVariablesFromLocalStorage[id] = {
+				selectedValue: value,
+				allSelected,
+			};
+
+			allDashboardsFromLocalStorage = {
+				...allDashboardsFromLocalStorage,
+				[dashboardId]: {
+					...currentDashboardVariablesFromLocalStorage,
+				},
+			};
+
+			setLocalStorageKey(
+				LOCALSTORAGE.DASHBOARD_VARIABLES,
+				JSON.stringify(allDashboardsFromLocalStorage),
+			);
+
 			const variables = convertVariablesToDbFormat(newVariablesArr);
 
-			if (role !== 'VIEWER' && selectedDashboard) {
-				updateVariables(name, variables);
-			}
+			setSelectedDashboard({
+				...selectedDashboard,
+				data: {
+					...selectedDashboard?.data,
+					variables: {
+						...variables,
+					},
+				},
+			});
+
+			// if (role !== 'VIEWER' && selectedDashboard) {
+			// 	updateVariables(name, variables);
+			// }
 			onVarChanged(name);
 
 			setUpdate(!update);
