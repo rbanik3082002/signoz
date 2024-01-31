@@ -2,19 +2,17 @@ import { Row } from 'antd';
 import getLocalStorageKey from 'api/browser/localstorage/get';
 import setLocalStorageKey from 'api/browser/localstorage/set';
 import { LOCALSTORAGE } from 'constants/localStorage';
-import { useUpdateDashboard } from 'hooks/dashboard/useUpdateDashboard';
-import { useNotifications } from 'hooks/useNotifications';
 import { defaultTo } from 'lodash-es';
 import { useDashboard } from 'providers/Dashboard/Dashboard';
 import { memo, useEffect, useState } from 'react';
-import { useSelector } from 'react-redux';
-import { AppState } from 'store/reducers';
-import { Dashboard, IDashboardVariable } from 'types/api/dashboard/getAll';
-import AppReducer from 'types/reducer/app';
+import { IDashboardVariable } from 'types/api/dashboard/getAll';
 
 import { convertVariablesToDbFormat } from './util';
-// import { convertVariablesToDbFormat } from './util';
 import VariableItem from './VariableItem';
+
+interface DashboardVariables {
+	[id: string]: unknown;
+}
 
 function DashboardVariableSelection(): JSX.Element | null {
 	const {
@@ -31,8 +29,6 @@ function DashboardVariableSelection(): JSX.Element | null {
 	const [lastUpdatedVar, setLastUpdatedVar] = useState<string>('');
 
 	const [variablesTableData, setVariablesTableData] = useState<any>([]);
-
-	// const { role } = useSelector<AppState, AppReducer>((state) => state.app);
 
 	useEffect(() => {
 		if (variables) {
@@ -61,40 +57,6 @@ function DashboardVariableSelection(): JSX.Element | null {
 		setUpdate(!update);
 	};
 
-	const updateMutation = useUpdateDashboard();
-	const { notifications } = useNotifications();
-
-	const updateVariables = (
-		name: string,
-		updatedVariablesData: Dashboard['data']['variables'],
-	): void => {
-		if (!selectedDashboard) {
-			return;
-		}
-
-		updateMutation.mutateAsync(
-			{
-				...selectedDashboard,
-				data: {
-					...selectedDashboard.data,
-					variables: updatedVariablesData,
-				},
-			},
-			{
-				onSuccess: (updatedDashboard) => {
-					if (updatedDashboard.payload) {
-						setSelectedDashboard(updatedDashboard.payload);
-					}
-				},
-				onError: () => {
-					notifications.error({
-						message: `Error updating ${name} variable`,
-					});
-				},
-			},
-		);
-	};
-
 	const onValueUpdate = (
 		name: string,
 		id: string,
@@ -119,8 +81,8 @@ function DashboardVariableSelection(): JSX.Element | null {
 				LOCALSTORAGE.DASHBOARD_VARIABLES,
 			);
 
-			let allDashboardsFromLocalStorage = {};
-			let currentDashboardVariablesFromLocalStorage = {};
+			let allDashboardsFromLocalStorage: DashboardVariables = {};
+			let currentDashboardVariablesFromLocalStorage: DashboardVariables = {};
 
 			if (allDashboardVariablesFromLocalStorageString === null) {
 				setLocalStorageKey(
@@ -134,9 +96,6 @@ function DashboardVariableSelection(): JSX.Element | null {
 					allDashboardsFromLocalStorage = JSON.parse(
 						allDashboardVariablesFromLocalStorageString,
 					);
-					// currentDashboardVariablesFromLocalStorage = JSON.parse(
-					// 	allDashboardVariablesFromLocalStorage,
-					// )[dashboardId];
 				} catch {
 					allDashboardsFromLocalStorage = {};
 				}
@@ -144,7 +103,7 @@ function DashboardVariableSelection(): JSX.Element | null {
 			currentDashboardVariablesFromLocalStorage = defaultTo(
 				allDashboardsFromLocalStorage?.[dashboardId],
 				{},
-			);
+			) as DashboardVariables;
 			currentDashboardVariablesFromLocalStorage[id] = {
 				selectedValue: value,
 				allSelected,
@@ -164,19 +123,18 @@ function DashboardVariableSelection(): JSX.Element | null {
 
 			const variables = convertVariablesToDbFormat(newVariablesArr);
 
-			setSelectedDashboard({
-				...selectedDashboard,
-				data: {
-					...selectedDashboard?.data,
-					variables: {
-						...variables,
+			if (selectedDashboard) {
+				setSelectedDashboard({
+					...selectedDashboard,
+					data: {
+						...selectedDashboard?.data,
+						variables: {
+							...variables,
+						},
 					},
-				},
-			});
+				});
+			}
 
-			// if (role !== 'VIEWER' && selectedDashboard) {
-			// 	updateVariables(name, variables);
-			// }
 			onVarChanged(name);
 
 			setUpdate(!update);
